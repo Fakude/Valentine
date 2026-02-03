@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Valentine Scratch 💖</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+html,body{
+  margin:0;
+  padding:0;
+  height:100%;
+  overflow:hidden;
+  font-family:'Segoe UI',sans-serif;
+  background:#fff;
+  text-align:center;
+}
+
+/* ---------- Scratch Card ---------- */
+#card{
+  width:320px;
+  height:200px;
+  margin:100px auto 20px;
+  border-radius:20px;
+  background:#ff2d55;
+  position:relative;
+  box-shadow:0 15px 40px rgba(0,0,0,.3);
+}
+#message{
+  position:absolute;
+  inset:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  color:white;
+  font-size:26px;
+  font-weight:bold;
+  padding:20px;
+  text-align:center;
+}
+canvas#scratch{
+  position:absolute;
+  inset:0;
+  border-radius:20px;
+  cursor:crosshair;
+}
+
+/* ---------- Buttons ---------- */
+button{
+  padding:14px 30px;
+  font-size:18px;
+  border:none;
+  border-radius:30px;
+  cursor:pointer;
+  transition:transform 0.2s, box-shadow 0.2s;
+  margin:10px;
+}
+button:hover{
+  transform:scale(1.05);
+  box-shadow:0 8px 20px rgba(0,0,0,.2);
+}
+.yes{background:#ff2d55;color:white;}
+.no{background:#222;color:white;position:absolute;}
+
+.hidden{display:none !important;}
+
+/* ---------- Starfield ---------- */
+#starfield{
+  position:fixed;
+  inset:0;
+  z-index:-1;
+}
+
+/* ---------- Hearts ---------- */
+.heart{
+  position:fixed;
+  bottom:-30px;
+  font-size:24px;
+  animation:float 6s linear infinite;
+  pointer-events:none;
+}
+@keyframes float{
+  to{
+    transform:translateY(-110vh);
+    opacity:0;
+  }
+}
+
+/* ---------- Kissing Hearts Animation ---------- */
+#kissing-hearts{
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,0.8);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  z-index:1000;
+}
+.kissing-container{
+  position:relative;
+  width:300px;
+  height:200px;
+}
+.kissing-heart{
+  position:absolute;
+  font-size:80px;
+  animation:kiss 2s ease-in-out infinite;
+}
+.kissing-heart.left{
+  left:0;
+  animation-delay:0s;
+}
+.kissing-heart.right{
+  right:0;
+  animation-delay:0s;
+  transform:scaleX(-1);
+}
+@keyframes kiss{
+  0%, 100%{transform:translateX(0) rotate(0deg);}
+  50%{transform:translateX(50px) rotate(10deg);}
+}
+.kissing-heart.right{
+  animation-name:kissRight;
+}
+@keyframes kissRight{
+  0%, 100%{transform:translateX(0) scaleX(-1) rotate(0deg);}
+  50%{transform:translateX(-50px) scaleX(-1) rotate(-10deg);}
+}
+
+/* ---------- Calendar ---------- */
+#calendar-container{
+  position:fixed;
+  inset:0;
+  background:linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  overflow-y:auto;
+  padding:20px;
+}
+#calendar{
+  max-width:800px;
+  margin:0 auto;
+  display:grid;
+  grid-template-columns:repeat(auto-fit, minmax(100px, 1fr));
+  gap:10px;
+  padding:20px;
+}
+.day{
+  background:#fff;
+  padding:15px;
+  border-radius:12px;
+  cursor:pointer;
+  box-shadow:0 5px 15px rgba(0,0,0,.15);
+  transition:all 0.3s;
+  font-weight:500;
+}
+.day:hover{
+  transform:translateY(-5px);
+  box-shadow:0 10px 25px rgba(0,0,0,.25);
+  background:#ffe0e8;
+}
+
+/* ---------- Content Sections ---------- */
+.content-section{
+  max-width:600px;
+  margin:0 auto;
+  padding:40px 20px;
+}
+
+/* ---------- Progress Indicator ---------- */
+.progress-text{
+  color:#666;
+  font-size:14px;
+  margin-top:10px;
+}
+</style>
+</head>
+
+<body>
+
+<h2 id="instruction">Scratch to reveal message </h2>
+<p class="progress-text">Use your finger or mouse to scratch!</p>
+
+<div id="card">
+  <div id="message">Will you be my Valentine? 💘</div>
+  <canvas id="scratch"></canvas>
+</div>
+
+<div id="choices" class="hidden">
+  <p style="font-size:18px;margin:20px;">⚠️ Your response will be sent to WhatsApp 💌</p>
+  <button class="yes" onclick="handleYes()">Yes 💖</button>
+  <button class="no" id="noBtn">No 😈</button>
+</div>
+
+<div id="content"></div>
+<canvas id="starfield" class="hidden"></canvas>
+
+<script>
+/* ---------- Scratch Logic ---------- */
+const canvas=document.getElementById("scratch");
+const ctx=canvas.getContext("2d");
+canvas.width=320; 
+canvas.height=200;
+
+// Create silver scratch coating
+ctx.fillStyle="#c0c0c0";
+ctx.fillRect(0,0,320,200);
+
+// Add some texture
+ctx.fillStyle="#d3d3d3";
+for(let i=0;i<100;i++){
+  ctx.fillRect(Math.random()*320, Math.random()*200, 2, 2);
+}
+
+let cleared=0, drawing=false;
+
+// Mouse events
+canvas.onmousedown=()=>drawing=true;
+canvas.onmouseup=()=>drawing=false;
+canvas.onmouseleave=()=>drawing=false;
+
+canvas.onmousemove=e=>{
+  if(!drawing)return;
+  scratch(e.clientX, e.clientY);
+};
+
+// Touch events for mobile
+canvas.ontouchstart=e=>{
+  e.preventDefault();
+  drawing=true;
+};
+canvas.ontouchend=()=>drawing=false;
+canvas.ontouchmove=e=>{
+  e.preventDefault();
+  if(!drawing)return;
+  const touch=e.touches[0];
+  scratch(touch.clientX, touch.clientY);
+};
+
+function scratch(x, y){
+  const r=canvas.getBoundingClientRect();
+  ctx.globalCompositeOperation="destination-out";
+  ctx.beginPath();
+  ctx.arc(x-r.left, y-r.top, 20, 0, Math.PI*2);
+  ctx.fill();
+  cleared++;
+  
+  // Show choices after enough scratching
+  if(cleared>150){
+    canvas.style.display="none";
+    document.getElementById("instruction").textContent="What's your answer? 💭";
+    document.getElementById("choices").classList.remove("hidden");
+  }
+}
+
+/* ---------- No Button Chaos ---------- */
+let noCount=0;
+const noBtn=document.getElementById("noBtn");
+
+noBtn.onclick=()=>{
+  noCount++;
+  moveNo();
+
+  if(noCount===4){
+    startStarfield();
+  }
+
+  if(noCount>=9){
+    document.getElementById("choices").innerHTML=`
+      <h2 style="color:#ff2d55;">Abongile ungiceda umoya mama 🥺</h2>
+      <p>Please, just one chance?</p>
+      <button class="yes" onclick="handleYes()">Fine, we can go on a date 💞</button>
+      <button class="no" onclick="send('Not happening mfo 😭')">Not happening mfo</button>
+    `;
+  }
+};
+
+function moveNo(){
+  const maxX = window.innerWidth - 150;
+  const maxY = window.innerHeight - 100;
+  noBtn.style.left=Math.random()*maxX+"px";
+  noBtn.style.top=Math.random()*maxY+"px";
+}
+
+/* ---------- YES FLOW ---------- */
+function handleYes(){
+  vibrateLove();
+  spawnCelebrationHearts();
+  
+  document.body.innerHTML=`
+    <canvas id="starfield"></canvas>
+    <div class="content-section">
+      <h1 style="color:#ff2d55;font-size:48px;margin:60px 0 20px;">💖 She said YES! 💖</h1>
+      <p style="font-size:20px;color:#333;margin:30px 0;">Would you like to set an official date for our first date?</p>
+      <button class="yes" onclick="showCalendar()">Yes, let's set a date! 💍</button>
+      <button class="no" style="position:static;background:#666;" onclick="skipDate()">Maybe later 😘</button>
+    </div>
+  `;
+  
+  // Start starfield after DOM is updated
+  setTimeout(()=>{
+    startStarfield();
+  }, 10);
+}
+
+/* ---------- Calendar ---------- */
+function showCalendar(){
+  document.body.innerHTML=`
+    <canvas id="starfield"></canvas>
+    <div id="calendar-container">
+      <h1 style="color:white;margin-bottom:10px;">Choose Our Special Date 🌷</h1>
+      <p style="color:white;opacity:0.9;margin-bottom:30px;">Pick a date that works for you!</p>
+      <div id="calendar"></div>
+    </div>
+  `;
+  
+  const cal=document.getElementById("calendar");
+  const months=[
+    {name:"February", days:28},
+    {name:"March", days:31},
+    {name:"April", days:30},
+    {name:"May", days:31},
+    {name:"June", days:30},
+    {name:"July", days:19}
+  ];
+
+  months.forEach(month=>{
+    for(let d=1; d<=month.days; d++){
+      const el=document.createElement("div");
+      el.className="day";
+      el.innerHTML=`<div style="font-size:12px;color:#999;">${month.name}</div><div style="font-size:20px;font-weight:bold;color:#ff2d55;">${d}</div>`;
+      el.onclick=()=>{
+        showConfirmation(`${month.name} ${d}`);
+      };
+      cal.appendChild(el);
+    }
+  });
+  
+  setTimeout(()=>{
+    startStarfield();
+  }, 10);
+}
+
+function showConfirmation(date){
+  const now=new Date().toLocaleString();
+  
+  document.body.innerHTML=`
+    <canvas id="starfield"></canvas>
+    <div class="content-section">
+      <h1 style="color:#ff2d55;font-size:42px;">Perfect! 🎉</h1>
+      <p style="font-size:24px;margin:30px 0;">Our date is set for:</p>
+      <h2 style="color:#ff2d55;font-size:36px;">${date}, 2026</h2>
+      <p style="font-size:18px;color:#666;margin-top:40px;">Can't wait to see you! 💕</p>
+    </div>
+  `;
+  setTimeout(()=>{
+    startStarfield();
+    spawnCelebrationHearts();
+  }, 10);
+  
+  // Send to WhatsApp with date
+  setTimeout(()=>{
+    send(`Abongile said YES! ❤️ Our date is set for ${date}, 2026 💕 (${now})`);
+  }, 1500);
+}
+
+/* ---------- Skip Date - Show Kissing Hearts ---------- */
+function skipDate(){
+  const now=new Date().toLocaleString();
+  
+  document.body.innerHTML=`
+    <div id="kissing-hearts">
+      <div class="kissing-container">
+        <div class="kissing-heart left">💋</div>
+        <div class="kissing-heart right">💋</div>
+        <p style="color:white;position:absolute;bottom:-60px;width:100%;text-align:center;font-size:20px;">
+          That's okay, we'll figure it out together 💞
+        </p>
+      </div>
+    </div>
+  `;
+  
+  // Send message to WhatsApp
+  setTimeout(()=>{
+    send(`Abongile said YES! ❤️ We'll set the date later 💕 (${now})`);
+  }, 2000);
+  
+  // Remove animation after 5 seconds and show option
+  setTimeout(()=>{
+    document.body.innerHTML=`
+      <canvas id="starfield"></canvas>
+      <div class="content-section">
+        <h1 style="color:#ff2d55;">No pressure! 😊</h1>
+        <p style="font-size:20px;margin:30px 0;">We can decide on a date whenever you're ready 💕</p>
+        <button class="yes" onclick="showCalendar()">Actually, let's pick a date now! 💍</button>
+      </div>
+    `;
+    setTimeout(()=>{
+      startStarfield();
+    }, 10);
+  }, 5000);
+}
+
+/* ---------- WhatsApp ---------- */
+function send(msg){
+  window.location.href=`https://wa.me/27646551216?text=${encodeURIComponent(msg)}`;
+}
+
+/* ---------- Starfield Animation ---------- */
+let starfieldRunning=false;
+let animationId=null;
+
+function startStarfield(){
+  // Reset the flag to allow restarting
+  starfieldRunning=false;
+  
+  if(starfieldRunning) return;
+  starfieldRunning=true;
+  
+  const c=document.getElementById("starfield");
+  if(!c){
+    console.log("Starfield canvas not found");
+    starfieldRunning=false;
+    return;
+  }
+  
+  c.classList.remove("hidden");
+  const x=c.getContext("2d");
+  c.width=innerWidth; 
+  c.height=innerHeight;
+
+  const stars=Array.from({length:150},()=>({
+    x:Math.random()*c.width,
+    y:Math.random()*c.height,
+    z:Math.random()*c.width
+  }));
+
+  function draw(){
+    if(!document.getElementById("starfield")){
+      // Canvas was removed, stop animation
+      if(animationId) cancelAnimationFrame(animationId);
+      starfieldRunning=false;
+      return;
+    }
+    
+    x.fillStyle="rgba(0,0,0,0.2)";
+    x.fillRect(0,0,c.width,c.height);
+    stars.forEach(s=>{
+      s.z-=2;
+      if(s.z<=0){
+        s.z=c.width;
+        s.x=Math.random()*c.width;
+        s.y=Math.random()*c.height;
+      }
+      const k=128/s.z;
+      const px=s.x*k+c.width/2;
+      const py=s.y*k+c.height/2;
+      if(px>=0&&px<=c.width&&py>=0&&py<=c.height){
+        x.fillStyle="white";
+        x.fillRect(px,py,2,2);
+      }
+    });
+    animationId=requestAnimationFrame(draw);
+  }
+  draw();
+}
+
+/* ---------- Celebration Hearts ---------- */
+function spawnCelebrationHearts(){
+  for(let i=0;i<20;i++){
+    setTimeout(()=>{
+      const h=document.createElement("div");
+      h.className="heart";
+      h.innerText=["❤️","🌷","💖","🌷","💝"][Math.floor(Math.random()*5)];
+      h.style.left=Math.random()*100+"vw";
+      h.style.animationDuration=(4+Math.random()*3)+"s";
+      document.body.appendChild(h);
+      setTimeout(()=>h.remove(),7000);
+    }, i*100);
+  }
+}
+
+/* ---------- Vibrate I LOVE YOU ---------- */
+function vibrateLove(){
+  if(navigator.vibrate){
+    navigator.vibrate([200,100,200,100,600,100,200,100,200]);
+  }
+}
+</script>
+
+</body>
+</html>
